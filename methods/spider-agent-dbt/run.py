@@ -13,6 +13,31 @@ from spider_agent.envs.spider_agent import Spider_Agent_Env
 from spider_agent.agent.agents import PromptAgent
 
 
+
+# Ensure all required packages are installed
+import subprocess
+
+REQUIRED_PACKAGES = [
+    "google-cloud-bigquery", "pyarrow", "db-dtypes", "pandas", "matplotlib",
+    "scikit-learn", "seaborn", "numpy", "scipy", "statsmodels", "xgboost",
+    "plotly", "tabulate", "snowflake-connector-python", "duckdb", "openpyxl"
+]
+
+def safe_install(packages):
+    try:
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install",
+            "--no-cache-dir", "--prefer-binary", "--timeout", "60", "--retries", "5",
+            *packages
+        ])
+    except subprocess.CalledProcessError as e:
+        print(f"🚨 pip install failed: {e}")
+        sys.exit(1)
+
+# Uncomment below if you want to auto-install at runtime
+safe_install(REQUIRED_PACKAGES)
+
+
 #  Logger Configs {{{ #
 logger = logging.getLogger("spider_agent")
 logger.setLevel(logging.DEBUG)
@@ -125,7 +150,8 @@ def test(
             else:
                 indices = list(map(int, args.example_index.split(",")))
                 task_configs = [task_configs[i] for i in indices]
-    
+    # ✅ Hard limit the number of tasks to 10 for debugging or fast iteration
+    task_configs = task_configs[:10]
     for task_config in task_configs:
         instance_id = experiment_id +"/"+ task_config["instance_id"]
         output_dir = os.path.join(args.output_dir, instance_id)
