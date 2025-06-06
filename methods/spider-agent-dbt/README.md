@@ -65,8 +65,7 @@ python run.py --model gpt-4o -s test1
 ### Example
 
 ```bash
-python run.py --model gpt-4o -s experiment_name
-python run.py --model gpt-4o -s experiment_name
+python run.py --model gpt-4o --num_problems 10 --max_workers 4 -s experiment_name
 ```
 
 ---

@@ -2,7 +2,7 @@ FROM python:3.11
 
 WORKDIR /workspace
 
-# Update and install system dependencies
+# Update and install dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
@@ -14,15 +14,12 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
+# Upgrade pip and install Python packages
 RUN pip install --upgrade pip
 
-# Install Python packages with retries and timeout (note: no --resume-retries)
-RUN pip install --default-timeout=100 --retries=10 --no-cache-dir \
+RUN pip install --default-timeout=100 --retries=10 --resume-retries --no-cache-dir \
     google-cloud-bigquery pyarrow db-dtypes pandas matplotlib scikit-learn seaborn \
     numpy scipy statsmodels xgboost plotly tabulate snowflake-connector-python duckdb openpyxl
 
-# Install DBT plugin separately
-RUN pip install --default-timeout=100 --retries=10 --no-cache-dir dbt-duckdb
-
+# Set the default command to run when starting the container
 CMD ["/bin/bash"]

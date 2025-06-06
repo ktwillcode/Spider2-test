@@ -57,7 +57,7 @@ def call_llm(payload):
                 time.sleep(4 * (2 ** (i + 1)))
         return False, code_value
     
-    elif model.startswith("o1"):
+    elif model.startswith("o1") or model.startswith("o4-mini-2025-04-16"):
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"
@@ -197,7 +197,7 @@ def call_llm(payload):
         return False, code_value
                            
 
-    elif model.startswith("mixtral"):
+    elif model.startswith("mixtral") or model.startswith("llama-3.3-70b-versatile"):
         messages = payload["messages"]
         max_tokens = payload["max_tokens"]
         top_p = payload["top_p"]

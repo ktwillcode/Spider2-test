@@ -6,11 +6,37 @@ import os
 import random
 import sys
 import glob
+import concurrent.futures
 
 from tqdm import tqdm
 
 from spider_agent.envs.spider_agent import Spider_Agent_Env
 from spider_agent.agent.agents import PromptAgent
+
+
+
+# Ensure all required packages are installed
+import subprocess
+
+REQUIRED_PACKAGES = [
+    "google-cloud-bigquery", "pyarrow", "db-dtypes", "pandas", "matplotlib",
+    "scikit-learn", "seaborn", "numpy", "scipy", "statsmodels", "xgboost",
+    "plotly", "tabulate", "snowflake-connector-python", "duckdb", "openpyxl"
+]
+
+def safe_install(packages):
+    try:
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install",
+            "--no-cache-dir", "--prefer-binary", "--timeout", "60", "--retries", "5",
+            *packages
+        ])
+    except subprocess.CalledProcessError as e:
+        print(f"🚨 pip install failed: {e}")
+        sys.exit(1)
+
+# Uncomment below if you want to auto-install at runtime
+safe_install(REQUIRED_PACKAGES)
 
 
 #  Logger Configs {{{ #
@@ -75,32 +101,20 @@ def config() -> argparse.Namespace:
     parser.add_argument("--plan", action="store_true")
 
     parser.add_argument("--dbt_only", action="store_true",default=True)
+    parser.add_argument("--max_workers", type=int, default=os.cpu_count() or 1, help="Number of parallel workers to use")
+    parser.add_argument("--num_problems", type=int, default=None, help="Number of problems to run. If not set, run all problems.")
     
     args = parser.parse_args()
 
     return args
 
-
-
-def test(
-    args: argparse.Namespace,
-    test_all_meta: dict = None
-) -> None:
-    scores = []
-    
-    # log args
-    logger.info("Args: %s", args)
-
-    if args.suffix == "":
-        logger.warning("No suffix is provided, the experiment id will be the model name.")
-        experiment_id = args.model.split("/")[-1]
-    else:
-        experiment_id = args.model.split("/")[-1] + "-" + args.suffix
-        
-    if args.plan:
-        experiment_id = f"{experiment_id}-plan"
-
-    
+def run_single_task(args_dict, task_config, experiment_id):
+    import os, json
+    from spider_agent.envs.spider_agent import Spider_Agent_Env
+    from spider_agent.agent.agents import PromptAgent
+    import logging
+    logger = logging.getLogger("spider_agent")
+    args = argparse.Namespace(**args_dict)
     agent = PromptAgent(
         model=args.model,
         max_tokens=args.max_tokens,
@@ -110,8 +124,70 @@ def test(
         max_steps=args.max_steps,
         use_plan=args.plan
     )
-    valid_ids = []
-    ## load task configs
+    instance_id = experiment_id + "/" + task_config["instance_id"]
+    output_dir = os.path.join(args.output_dir, instance_id)
+    result_json_path = os.path.join(output_dir, "spider/result.json")
+    if not args.overwriting and os.path.exists(result_json_path):
+        logger.info("Skipping %s", instance_id)
+        return instance_id
+    elif os.path.exists(result_json_path):
+        logger.info("Overwriting %s", instance_id)
+    else:
+        logger.info("Running %s", instance_id)
+    if args.retry_failed and os.path.exists(result_json_path):
+        with open(result_json_path, "r") as f:
+            result = json.load(f)
+            if result["finished"] and (not "FAIL" in result["result"]) and (not "error" in result["result"].lower()):
+                logger.info("Skipping %s", instance_id)
+                return instance_id
+        logger.info("Retrying %s", instance_id)
+    if os.path.exists(output_dir):
+        os.system(f"rm -rf {output_dir}")
+        logger.info("Removed existing %s", output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+    source_data_dir = os.path.dirname(args.test_path)
+    env_config = {
+        "init_args": {
+            "name": experiment_id,
+            "work_dir": "/workspace",
+        }
+    }
+    env_config["image_name"] = "spider_agent-image"
+    task_config['config'] = [{"type": "copy_all_subfiles", "parameters": {"dirs": [os.path.join(source_data_dir, task_config["instance_id"])]}}]
+    env_config["init_args"]["name"] = experiment_id + "-" + task_config["instance_id"]
+    env = Spider_Agent_Env(
+        env_config=env_config,
+        task_config=task_config,
+        cache_dir="./cache",
+        mnt_dir=output_dir
+    )
+    agent.set_env_and_task(env)
+    logger.info('Task input:' + task_config['instruction'])
+    done, result_output = agent.run()
+    trajectory = agent.get_trajectory()
+    os.makedirs(os.path.join(output_dir, "spider"), exist_ok=True)
+    result_files = env.post_process()
+    spider_result = {"finished": done, "steps": len(trajectory["trajectory"]),
+                       "result": result_output,"result_files": result_files, **trajectory}
+    with open(os.path.join(output_dir, "spider/result.json"), "w") as f:
+        json.dump(spider_result, f, indent=2)
+    logger.info("Finished %s", instance_id)
+    env.close()
+    return instance_id
+
+def test(
+    args: argparse.Namespace,
+    test_all_meta: dict = None
+) -> None:
+    scores = []
+    logger.info("Args: %s", args)
+    if args.suffix == "":
+        logger.warning("No suffix is provided, the experiment id will be the model name.")
+        experiment_id = args.model.split("/")[-1]
+    else:
+        experiment_id = args.model.split("/")[-1] + "-" + args.suffix
+    if args.plan:
+        experiment_id = f"{experiment_id}-plan"
     assert os.path.exists(args.test_path) and args.test_path.endswith(".jsonl"), f"Invalid test_path, must be a valid jsonl file: {args.test_path}"
     with open(args.test_path, "r") as f:
         task_configs = [json.loads(line) for line in f]
@@ -125,100 +201,17 @@ def test(
             else:
                 indices = list(map(int, args.example_index.split(",")))
                 task_configs = [task_configs[i] for i in indices]
-    
-    for task_config in task_configs:
-        instance_id = experiment_id +"/"+ task_config["instance_id"]
-        output_dir = os.path.join(args.output_dir, instance_id)
-        result_json_path =os.path.join(output_dir, "spider/result.json")
-
-        
-      
-        task_type = None
-        if task_config["instance_id"].startswith("bq") or task_config["instance_id"].startswith("ga"):
-            task_type = 'bq'
-        elif task_config["instance_id"].startswith("local"):
-            task_type = 'local'
-        elif task_config["instance_id"].startswith("sf"):
-            task_type = 'sf'
-        elif task_config["instance_id"].startswith("ch0"):
-            task_type = 'ch'
-        elif task_config["instance_id"].startswith("postgres"):
-            task_type = 'pg'
-        else:
-            task_type = 'dbt'
-
-
-        valid_types = set()
-
-        if args.dbt_only: valid_types.add('dbt')
-
-
-
-        valid_ids.append(task_config["instance_id"])
-        if not args.overwriting and os.path.exists(result_json_path):
-            logger.info("Skipping %s", instance_id)
-            continue
-        elif os.path.exists(result_json_path):
-            logger.info("Overwriting %s", instance_id)
-        else:
-            logger.info("Running %s", instance_id)
-        if args.retry_failed and os.path.exists(result_json_path):
-            with open(result_json_path, "r") as f:
-                result = json.load(f)
-                if result["finished"] and (not "FAIL" in result["result"]) and (not "error" in result["result"].lower()):
-                    logger.info("Skipping %s", instance_id)
-                    continue
-            logger.info("Retrying %s", instance_id)
-            
-        if os.path.exists(output_dir):
-            os.system(f"rm -rf {output_dir}")
-            logger.info("Removed existing %s", output_dir)
-
-        os.makedirs(output_dir, exist_ok=True)
-
-
-        source_data_dir = os.path.dirname(args.test_path)
-
-        env_config = \
-        {
-            "init_args": {
-                "name": experiment_id,
-                "work_dir": "/workspace",
-            }
-        }
-
-        env_config["image_name"] = "spider_agent-image"
-        task_config['config'] = [{"type": "copy_all_subfiles", "parameters": {"dirs": [os.path.join(source_data_dir, task_config["instance_id"])]}}]
-
-
-        env_config["init_args"]["name"] = experiment_id +"-"+ task_config["instance_id"]
-
-          
-
-
-        env = Spider_Agent_Env(
-            env_config=env_config,
-            task_config=task_config,
-            cache_dir="./cache",
-            mnt_dir=output_dir
-        )
-    
-        agent.set_env_and_task(env)
-    
-        logger.info('Task input:' + task_config['instruction'])
-        done, result_output = agent.run()
-        trajectory = agent.get_trajectory()
-
-        os.makedirs(os.path.join(output_dir, "spider"), exist_ok=True)
-        result_files = env.post_process()
-        spider_result = {"finished": done, "steps": len(trajectory["trajectory"]),
-                           "result": result_output,"result_files": result_files, **trajectory}
-        with open(os.path.join(output_dir, "spider/result.json"), "w") as f:
-            json.dump(spider_result, f, indent=2)
-        
-
-        logger.info("Finished %s", instance_id)
-        env.close()
+    if args.num_problems is not None:
+        task_configs = task_configs[:args.num_problems]
+    args_dict = vars(args)
+    max_workers = min(args.max_workers, len(task_configs))
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for task_config in task_configs:
+            futures.append(executor.submit(run_single_task, args_dict, task_config, experiment_id))
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            logger.info(f"Task {result} finished.")
 
 
 

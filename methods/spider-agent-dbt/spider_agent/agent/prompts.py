@@ -5,6 +5,9 @@ You can only use the actions provided in the ACTION SPACE to solve the task.
 For each step, you must output an Action; it cannot be empty. The maximum number of steps you can take is {max_steps}.
 Do not output an empty string!
 
+# CHAIN-OF-THOUGHT INSTRUCTION #
+For every observation, first write out your reasoning process step-by-step, explaining what you know, what you need to find out, and how you will proceed. Only after you have reasoned through the problem, select the most appropriate action from the ACTION SPACE. If you encounter an error or unexpected result, update your reasoning and try a different approach. Do not repeat the same action if it did not work previously. Always update your reasoning based on new information.
+
 # ACTION SPACE #
 {action_space}
 
@@ -44,6 +47,9 @@ You are starting in the {work_dir} directory, which contains all the data needed
 You can only use the actions provided in the ACTION SPACE to solve the task. 
 For each step, you must output an Action; it cannot be empty. The maximum number of steps you can take is {max_steps}.
 Do not output an empty string!
+
+# CHAIN-OF-THOUGHT INSTRUCTION #
+For every observation, first write out your reasoning process step-by-step, explaining what you know, what you need to find out, and how you will proceed. Only after you have reasoned through the problem, select the most appropriate action from the ACTION SPACE. If you encounter an error or unexpected result, update your reasoning and try a different approach. Do not repeat the same action if it did not work previously. Always update your reasoning based on new information.
 
 # ACTION SPACE #
 {action_space}
@@ -87,6 +93,9 @@ For each step, you must output an Action; it cannot be empty. The maximum number
 Do not output an empty string! 
 Make sure you get valid results, not an empty file. Once the results are stored in `result.csv`, ensure the file contains answer. If it is empty or just table header, it means your SQL query is incorrect!
 
+# CHAIN-OF-THOUGHT INSTRUCTION #
+For every observation, first write out your reasoning process step-by-step, explaining what you know, what you need to find out, and how you will proceed. Only after you have reasoned through the problem, select the most appropriate action from the ACTION SPACE. If you encounter an error or unexpected result, update your reasoning and try a different approach. Do not repeat the same action if it did not work previously. Always update your reasoning based on new information.
+
 # ACTION SPACE #
 {action_space}
 
@@ -124,6 +133,9 @@ You are a data scientist proficient in database, SQL and DBT Project.
 You are starting in the {work_dir} directory, which contains all the codebase needed for your tasks. 
 You can only use the actions provided in the ACTION SPACE to solve the task. 
 For each step, you must output an Action; it cannot be empty. The maximum number of steps you can take is {max_steps}.
+
+# CHAIN-OF-THOUGHT INSTRUCTION #
+For every observation, first write out your reasoning process step-by-step, explaining what you know, what you need to find out, and how you will proceed. Only after you have reasoned through the problem, select the most appropriate action from the ACTION SPACE. If you encounter an error or unexpected result, update your reasoning and try a different approach. Do not repeat the same action if it did not work previously. Always update your reasoning based on new information.
 
 # ACTION SPACE #
 {action_space}
@@ -163,6 +175,9 @@ You are a data scientist proficient in database, SQL and clickhouse database.
 You are starting in the {work_dir} directory, which contains all the codebase needed for your tasks. 
 You can only use the actions provided in the ACTION SPACE to solve the task. 
 For each step, you must output an Action; it cannot be empty. The maximum number of steps you can take is {max_steps}.
+
+# CHAIN-OF-THOUGHT INSTRUCTION #
+For every observation, first write out your reasoning process step-by-step, explaining what you know, what you need to find out, and how you will proceed. Only after you have reasoned through the problem, select the most appropriate action from the ACTION SPACE. If you encounter an error or unexpected result, update your reasoning and try a different approach. Do not repeat the same action if it did not work previously. Always update your reasoning based on new information.
 
 # ACTION SPACE #
 {action_space}
@@ -204,6 +219,9 @@ You are a data scientist proficient in postgres database, SQL and DBT Project.
 You are starting in the {work_dir} directory, which contains all the codebase needed for your tasks. 
 You can only use the actions provided in the ACTION SPACE to solve the task. 
 For each step, you must output an Action; it cannot be empty. The maximum number of steps you can take is {max_steps}.
+
+# CHAIN-OF-THOUGHT INSTRUCTION #
+For every observation, first write out your reasoning process step-by-step, explaining what you know, what you need to find out, and how you will proceed. Only after you have reasoned through the problem, select the most appropriate action from the ACTION SPACE. If you encounter an error or unexpected result, update your reasoning and try a different approach. Do not repeat the same action if it did not work previously. Always update your reasoning based on new information.
 
 # ACTION SPACE #
 {action_space}
